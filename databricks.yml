@@ -1,0 +1,54 @@
+# Platform bundle: shared infrastructure and data-source connections.
+#
+# Naming convention rules applied here:
+#   - target names = environment codes (dev, test, prod) -> ${bundle.target} is the _<env> suffix
+#   - workspace objects (the job) carry no environment suffix
+#   - this bundle never runs in `mode: development` (no personal prefixes on shared objects)
+#
+# Deploy:  databricks bundle deploy -t <env>
+# Run:     databricks bundle run federation_setup -t <env>
+
+bundle:
+  name: data_platform
+
+variables:
+  rotate_credentials:
+    description: Re-apply credentials from UC secrets to existing connections ("true"/"false")
+    default: "false"
+
+resources:
+  jobs:
+    federation_setup:
+      name: platform_federation_setup
+      description: >
+        Creates _platform_<env>, connections, foreign catalogs (fed_), JDBC connections and
+        JDBC view catalogs (jdbc_) from config/sources_<env>.yml. Idempotent.
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: ./src/federation_setup.py
+            base_parameters:
+              env: ${bundle.target}
+              registry_path: ${workspace.file_path}/config/sources_${bundle.target}.yml
+              rotate: ${var.rotate_credentials}
+          # No compute block: runs on serverless (environment v4+ needed for UC secrets)
+
+targets:
+  dev:
+    default: true
+    workspace:
+      host: https://<dev-workspace-host>
+
+  # test:
+  #   workspace:
+  #     host: https://<test-workspace-host>
+  #   run_as:
+  #     service_principal_name: <platform-sp-application-id>
+
+  prod:
+    mode: production
+    workspace:
+      host: https://<prod-workspace-host>
+    run_as:
+      service_principal_name: <platform-sp-application-id>

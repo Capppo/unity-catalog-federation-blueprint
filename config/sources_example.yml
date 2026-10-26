@@ -1,0 +1,94 @@
+# Source registry - EXAMPLE (copy to sources_<env>.yml and adapt)
+#
+# Single source of truth for every data-source object in the metastore. Names are derived:
+#   connection    conn_<tech>_<source_id>[_<qualifier>]_<env>   (tech written once if source_id starts with it)
+#   fed catalog   fed_<source_id>[_<variant>]_<env>
+#   jdbc catalog  jdbc_<source_id>[_<variant>]_<env>.<view_schema>.<table>
+#   secrets       _platform_<env>.secrets.<secret_prefix>_{user,password}
+#                 (secret_prefix defaults to the connection name without _<env>)
+#
+# Copy this file to sources_test.yml / sources_prod.yml and change hosts, databases and owners.
+
+# Group or service principal that owns the generated JDBC views (needs USE CONNECTION).
+# Empty = the identity running the job.
+view_owner: ""
+
+# ---------------------------------------------------------------------------
+# Lakehouse Federation: one connection + one foreign catalog per entry
+# ---------------------------------------------------------------------------
+federation:
+  - source_id: ecom
+    tech: pg
+    type: POSTGRESQL
+    host: demo-db.cube.dev
+    port: "5432"
+    catalog_options: {database: ecom}
+    comment: Cube demo DB - e-commerce
+
+  - source_id: oralab
+    tech: ora
+    type: ORACLE
+    host: lab-server.example.com
+    port: "1521"
+    catalog_options: {service_name: freepdb1}
+    comment: Oracle Database Free - lab
+
+  - {source_id: alydb,    tech: pg, type: POSTGRESQL, host: lab-server.example.com, port: "5432", catalog_options: {database: alydb},    comment: Postgres lab server - alydb}
+  - {source_id: chinook,  tech: pg, type: POSTGRESQL, host: lab-server.example.com, port: "5432", catalog_options: {database: chinook},  comment: Postgres lab server - chinook}
+  - {source_id: denodo,   tech: pg, type: POSTGRESQL, host: lab-server.example.com, port: "5432", catalog_options: {database: denodo},   comment: Postgres lab server - denodo}
+  - {source_id: postgres, tech: pg, type: POSTGRESQL, host: lab-server.example.com, port: "5432", catalog_options: {database: postgres}, comment: Postgres lab server - postgres}
+
+  - source_id: pkdd_financial
+    variant: pg
+    tech: pg
+    type: POSTGRESQL
+    host: lab-server.example.com
+    port: "5432"
+    catalog_options: {database: pkdd_financial}
+    comment: PKDD99 financial - copy of CTU ctu_financial on the lab Postgres server
+
+  - source_id: yugalab
+    tech: yb
+    type: POSTGRESQL
+    host: <region>.<cluster-id>.aws.yugabyte.cloud
+    port: "5433"
+    catalog_options: {database: yugabyte}
+    cert: yugalab_root.crt          # file in _platform_<env>.certs.ca
+    comment: YugabyteDB Aeon - lab (PostgreSQL connector, not officially supported)
+
+  # On hold:
+  # - mosquito  (pg)         TCP access via Cloudflare still to be defined
+  # - keboola   (snowflake)  vendor-managed account rejects client IPs (network policy)
+  # - ctulab    (mariadb)    server without TLS, federation requires SSL -> JDBC below
+
+# ---------------------------------------------------------------------------
+# JDBC connections (no foreign catalog) + generated view catalogs
+# ---------------------------------------------------------------------------
+jdbc:
+  - source_id: ctulab
+    tech: mariadb
+    # sslMode=disable: no TLS on the server (public test data only)
+    # ANSI_QUOTES: Spark's generic dialect quotes identifiers with "..."
+    url: jdbc:mariadb://relational.fel.cvut.cz:3306/ctu_financial?sslMode=disable&sessionVariables=sql_mode=ANSI_QUOTES
+    jars: ["mariadb-java-client-*.jar"]
+    view_schemas: [ctu_financial]
+    comment: CTU relational repository (MariaDB 10.6, no TLS) - JDBC workaround
+
+  - source_id: pkdd_financial
+    variant: pg
+    qualifier: jdbc
+    secret_prefix: conn_pg_pkdd_financial       # reuses the federation secrets
+    tech: pg
+    url: jdbc:postgresql://lab-server.example.com:5432/pkdd_financial
+    jars: ["postgresql-*.jar"]
+    view_schemas: [ctu_financial]
+    comment: PKDD99 financial via JDBC - pushdown comparison with federation
+
+  - source_id: denodo_29090
+    tech: denodo
+    url: jdbc:denodo://lab-server.example.com:9999/financial
+    jars: ["denodo-vdp-jdbcdriver-*.jar"]
+    view_schemas: [financial]                    # one schema per virtual database
+    comment: Denodo instance 29090
+
+  # - source_id: denodo_39090  (same pattern, to be enabled)

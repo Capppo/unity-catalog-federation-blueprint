@@ -1,0 +1,17 @@
+# Real source registries contain hosts and ports: keep them out of the repository
+config/sources_*.yml
+!config/sources_example.yml
+
+# Databricks bundle local state
+.databricks/
+
+# Python / OS
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+
+# Drivers and certificates are uploaded to volumes, never committed
+*.jar
+*.crt
+*.pem
