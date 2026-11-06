@@ -8,6 +8,12 @@
 --   conn_denodo_29090_dev                     JDBC connection     -> Denodo (remote_query)
 --
 -- Put EXPLAIN in front of each query to see what is pushed down to each source.
+--
+-- NOTE: the jdbc_* catalogs use remote_query on JDBC connections. On a serverless
+-- SQL warehouse these require the workspace preview "Enable networking for isolated
+-- workloads in Serverless SQL Warehouses" (Settings > Advanced). Without it, queries
+-- fail with "The connection attempt failed." - the federation catalog is unaffected.
+-- Alternative: run from serverless job compute or a standard-access cluster (DBR 17.3+).
 -- =====================================================================
 
 
